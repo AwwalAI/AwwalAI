@@ -54,8 +54,7 @@ def generate_quiz(context, objective=True, subjective=True, num_objective=5, num
                 ]
             }
 
-            Now, generate {num_objective} objective and {num_subjective} subjective question and answer pairs:
-
+            Now, generate '''+str(num_objective)+'''objective and'''+str(num_subjective)+'''subjective question and answer pairs:
     '''
     
     if objective and subjective:
