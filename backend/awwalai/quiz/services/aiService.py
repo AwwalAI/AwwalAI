@@ -1,5 +1,6 @@
 import google.generativeai as genai
 import os
+import json
 
 # Fetch the API key from environment variables
 api_key = os.getenv("GOOGLE_API_KEY")
@@ -66,4 +67,7 @@ def generate_quiz(context, objective=True, subjective=True, num_objective=5, num
 
     # Generate the content
     response = model.generate_content(prompt)
-    return(response.text)
+    cleaned_string = response.text.strip().strip('`json').strip('`')
+    parsed_quiz = json.loads(cleaned_string)
+
+    return(parsed_quiz)

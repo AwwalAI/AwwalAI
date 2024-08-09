@@ -1,77 +1,63 @@
-from rest_framework import viewsets, status
+from rest_framework import status
 from rest_framework.response import Response
-from rest_framework.decorators import action
-from .models import Document, Quiz, Question
-from .serializers import DocumentSerializer, QuizSerializer, QuestionSerializer
-import google.generativeai as genai
+from rest_framework.views import APIView
+from rest_framework.permissions import IsAuthenticated
+from .services.file_processing_service import FileProcessingService
+from .services.webscrapService import get_text_from_url
+from .services.aiService import generate_quiz  # Assuming this is the function in your aiservice.py
+from .models import QuizHistory  # You'll need to create this model
 
-genai.configure(api_key="AIzaSyC-LUvMCSM3oaFimJxK1ROjXlrb67T3Kd0")
+class GenerateQuizAPIView(APIView):
+    permission_classes = [IsAuthenticated]
 
-class DocumentViewSet(viewsets.ModelViewSet):
-    queryset = Document.objects.all()
-    serializer_class = DocumentSerializer
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.file_processing_service = FileProcessingService()
 
-    def perform_create(self, serializer):
-        serializer.save(user=self.request.user)
-
-    @action(detail=True, methods=['post'])
-    def generate_quiz(self, request, pk=None):
-        document = self.get_object()
-        # Process the document and extract context
-        context = self.extract_text(document.file.path)
+    def post(self, request, *args, **kwargs):
+        file = request.FILES.get('file')
+        url = request.data.get('url')
         
-        # Generate questions and answers
-        prompt = f"""
-        Read the following text carefully:
+        if not file and not url:
+            return Response({'error': 'Either a file or URL must be provided.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        Context: {context}
+        if file and url:
+            return Response({'error': 'Please provide either a file or URL, not both.'}, status=status.HTTP_400_BAD_REQUEST)
 
-        Task: Generate up to 10 high-quality question and answer pairs based on the given context. Follow these guidelines:
+        try:
+            if file:
+                content = self.process_file(file)
+            else:
+                content = self.scrape_url(url)
 
-        1. Question:
-           - Make it relevant to the context
-           - Ensure it's specific and thought-provoking
-           - Use clear and concise language
+            # Extract quiz parameters from request data
+            objective = request.data.get('objective', True)
+            subjective = request.data.get('subjective', True)
+            num_objective = int(request.data.get('num_objective', 5))
+            num_subjective = int(request.data.get('num_subjective', 5))
 
-        2. Answer:
-           - Provide a comprehensive and accurate response
-           - Include key details from the context
-           - Keep the answer focused and to-the-point
+            # Generate quiz
+            quiz = generate_quiz(content, objective, subjective, num_objective, num_subjective)
+            # Save quiz to user's history
+            QuizHistory.objects.create(
+                user=request.user,
+                content=content,
+                quiz=quiz
+            )
 
-        Format:
-        Q: [Your generated question]
-        A: [Your generated answer]
+            return Response({'quiz': quiz}, status=status.HTTP_200_OK)
 
-        Now, generate question and answer pairs:
-        """
-        
-        generation_config = {
-            "temperature": 0.9,
-            "top_p": 0.95,
-            "top_k": 32,
-            "max_output_tokens": 1024,
-            "response_mime_type": "text/plain",
-        }
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
-        model = genai.GenerativeModel(
-            model_name="gemini-1.5-flash",
-            generation_config=generation_config,
-        )
+    def process_file(self, file):
+        max_file_size = 10 * 1024 * 1024  # 10 MB
+        if file.size > max_file_size:
+            raise ValueError('File size exceeds the limit of 10MB')
+        return self.file_processing_service.process_file(file)
 
-        response = model.generate_content(prompt)
-
-        quiz = Quiz.objects.create(user=request.user, context=context)
-        for qa_pair in response.text.split("\n\n"):
-            question_text, answer_text = qa_pair.split("\nA: ")
-            question_text = question_text.replace("Q: ", "")
-            Question.objects.create(quiz=quiz, question_text=question_text, answer_text=answer_text)
-
-        return Response(QuizSerializer(quiz).data, status=status.HTTP_201_CREATED)
-
-    def extract_text(self, file_path):
-        # Implement your document extraction logic here
-        return "Extracted text from document"
-
-class QuizViewSet(viewsets.ModelViewSet):
-    queryset = Quiz.objects.all()
-    serializer_class = QuizSerializer
+    def scrape_url(self, url):
+        content = get_text_from_url(url)
+        if content is None:
+            raise ValueError('Unable to scrape the provided URL. Please ensure the web page is publicly available.')
+        return content

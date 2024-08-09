@@ -1,11 +1,6 @@
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
-from .views import DocumentViewSet, QuizViewSet
-
-router = DefaultRouter()
-router.register(r'documents', DocumentViewSet)
-router.register(r'quizzes', QuizViewSet)
+from django.urls import path
+from .views import GenerateQuizAPIView
 
 urlpatterns = [
-    path('', include(router.urls)),
+    path('generate-quiz/', GenerateQuizAPIView.as_view(), name='generate_quiz'),
 ]
