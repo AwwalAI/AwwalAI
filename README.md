@@ -1,106 +1,221 @@
-To design the architecture and APIs for an application that generates quizzes from user-provided content, presents quizzes to users, checks answers, and generates reports while maintaining history, you can follow a modular approach. Here's a step-by-step guide:
+### **Project Documentation: Dynamic Quiz Question Generator**
 
-1. Data Architecture
-1.1 Database Models
-You’ll need several models to manage the different aspects of the application:
+---
 
-User Model (CustomUser):
+#### **Overview**
 
-Fields: username, email, password, etc.
-Django's default or a custom user model can be used.
-Document/Content Model:
+The **Dynamic Quiz Question Generator** project is a web application designed to automatically generate quizzes from uploaded or provided text content. The system supports the generation of both objective (multiple-choice) and subjective (short answer) questions. It is built using Django and leverages various AI models, such as Llama and OpenAI's GPT, to create study-related quiz questions.
 
-Stores user-provided content (text, links, files).
-Fields: user, file, link, content_type (link/file), created_at.
-Quiz Model:
+---
 
-Stores the generated quizzes based on the content.
-Fields: user, content (ForeignKey to Document/Content), created_at.
-Question Model:
+### **Table of Contents**
 
-Stores individual questions associated with a quiz.
-Fields: quiz (ForeignKey to Quiz), question_text, question_type (objective/subjective), options (for objective), correct_answer.
-UserAnswer Model:
+1. [Directory Structure](#directory-structure)
+2. [Project Flow](#project-flow)
+3. [API Documentation](#api-documentation)
+4. [Model Descriptions](#model-descriptions)
+5. [Installation and Setup](#installation-and-setup)
+6. [Environment Variables](#environment-variables)
+7. [Testing](#testing)
+8. [Deployment](#deployment)
 
-Stores user answers to quiz questions.
-Fields: user, question (ForeignKey to Question), user_answer, is_correct, submitted_at.
-QuizResult Model:
+---
 
-Stores the results of a quiz attempt.
-Fields: user, quiz, score, total_questions, correct_answers, created_at.
-QuizHistory Model:
+### **Directory Structure**
 
-Stores a history of all quizzes taken by the user.
-Fields: user, quiz (ForeignKey to Quiz), quiz_result (ForeignKey to QuizResult), taken_at.
-1.2 Relationships
-One-to-Many between Quiz and Question.
-One-to-Many between Quiz and QuizResult.
-One-to-One or Many-to-One between User and UserAnswer.
-One-to-One between QuizResult and QuizHistory.
-2. API Design
-To support the application's functionality, you'll need several APIs:
+The project's directory structure is organized as follows:
 
-2.1 Content Upload API
-Purpose: Allow users to upload files or provide a link for content extraction.
-Method: POST
-Endpoint: /api/content/upload/
-Request Body: file, link
-Response: content_id, status
-2.2 Quiz Generation API
-Purpose: Generate a quiz based on the uploaded content.
-Method: POST
-Endpoint: /api/quiz/generate/
-Request Body: content_id, number_of_questions, question_type (objective/subjective)
-Response: quiz_id, questions
-2.3 Quiz Retrieval API
-Purpose: Retrieve the quiz for a user to take.
-Method: GET
-Endpoint: /api/quiz/<quiz_id>/
-Response: quiz, questions
-2.4 Answer Submission API
-Purpose: Allow users to submit answers to a quiz.
-Method: POST
-Endpoint: /api/quiz/<quiz_id>/submit/
-Request Body: question_id, user_answer
-Response: is_correct, score, feedback
-2.5 Quiz Result API
-Purpose: Retrieve the result of a completed quiz.
-Method: GET
-Endpoint: /api/quiz/<quiz_id>/result/
-Response: score, total_questions, correct_answers, feedback
-2.6 User Quiz History API
-Purpose: Retrieve a user's quiz history.
-Method: GET
-Endpoint: /api/user/<user_id>/history/
-Response: quiz_history (list of past quizzes with scores and dates)
-3. Flow of Operations
-User Uploads Content:
+```
+dynamic_quiz_project/
+│
+├── manage.py
+├── requirements.txt
+├── .env
+├── dynamic_quiz/
+│   ├── __init__.py
+│   ├── settings.py
+│   ├── urls.py
+│   ├── wsgi.py
+│   ├── asgi.py
+│   └── static/
+│       └── ...
+│
+├── quiz/
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── models.py
+│   ├── urls.py
+│   ├── views.py
+│   ├── serializers.py
+│   ├── tests.py
+│   ├── permissions.py
+│   ├── services/
+│   │   ├── __init__.py
+│   │   ├── aiservice.py
+│   │   └── answer_comparison_service.py
+|   |   └── file_processing_service.py
+|   |   └── webscrapeService.py
+│   ├── templates/
+│   │   └── ...
+│   └── migrations/
+│       └── ...
+│
+├── users/
+│   ├── __init__.py
+│   ├── admin.py
+│   ├── apps.py
+│   ├── models.py
+│   ├── urls.py
+│   ├── views.py
+│   ├── serializers.py
+│   ├── tests.py
+│   └── migrations/
+│       └── ...
+│
+└── docs/
+    ├── api_documentation.md
+    ├── architecture_diagram.png
+    └── ...
 
-The user uploads a file or provides a link.
-The content is extracted and stored in the database.
-Quiz Generation:
+```
 
-The extracted content is processed, and questions are generated.
-A quiz is created and stored with the associated questions.
-User Takes Quiz:
+---
 
-The user retrieves the quiz and submits answers.
-Answers are checked and stored.
-Result and History:
+### **Project Flow**
 
-The result is calculated and stored.
-The user’s quiz history is updated and can be retrieved later.
-4. Additional Considerations
-Authentication & Authorization:
-Ensure that only authenticated users can access their quizzes and history.
-Caching & Performance:
-Consider caching quiz data to improve performance.
-Logging & Monitoring:
-Implement logging for all critical actions to monitor user activity and system performance.
-5. Implementation Plan
-Define Models: Implement the database models in Django.
-Create Views: Implement the API views using Django’s class-based views.
-Test APIs: Use tools like Postman to test each API endpoint.
-Frontend Integration: Integrate with a frontend or mobile application to make it user-friendly.
-Deployment: Deploy the application on a cloud service like AWS, Heroku, or DigitalOcean.
-This architecture and API design provide a robust framework for building a quiz application that handles content extraction, quiz generation, and result tracking effectively.
+1. **User Registration and Authentication**: 
+   - Users must first register and authenticate to interact with the system.
+   - Registration includes basic user details and password.
+   - Upon successful registration, users can log in and receive a token for authenticated API requests.
+
+2. **Content Upload**:
+   - Users can upload files or provide URLs containing the text content from which quiz questions will be generated.
+   - The system processes the uploaded content to generate quizzes.
+   - The content can be plain text, documents, or URLs pointing to specific articles.
+
+3. **Quiz Generation**:
+   - Once content is uploaded, users can request the generation of quizzes.
+   - Users can specify the number of objective and subjective questions required.
+   - The AI service processes the content and generates questions based on the specified parameters.
+
+4. **Quiz Interaction**:
+   - Users can retrieve and attempt quizzes.
+   - They submit answers and receive immediate feedback on the correctness of their responses.
+   - The system stores quiz attempts and scores.
+
+5. **Results and Scoring**:
+   - After quiz completion, users can view their results, including scores and correct/incorrect answers.
+
+---
+
+### **API Documentation**
+
+**Refer to the [API Documentation](#api-documentation)** section for detailed information on the available endpoints, request/response formats, and status codes.
+
+---
+
+### **Model Descriptions**
+
+1. **Document Model**:
+   - **Description**: Represents the uploaded document.
+   - **Fields**:
+     - `user`: ForeignKey to the User model.
+     - `file`: FileField for document upload.
+     - `url`: URLField for content via URL.
+     - `created_at`: DateTimeField indicating when the document was uploaded.
+
+2. **Quiz Model**:
+   - **Description**: Represents a generated quiz.
+   - **Fields**:
+     - `user`: ForeignKey to the User model.
+     - `context`: TextField storing the text content.
+     - `created_at`: DateTimeField indicating when the quiz was generated.
+
+3. **Question Model**:
+   - **Description**: Represents a question in a quiz.
+   - **Fields**:
+     - `quiz`: ForeignKey to the Quiz model.
+     - `question_text`: TextField storing the question text.
+     - `answer_text`: TextField storing the correct answer text.
+     - `created_at`: DateTimeField indicating when the question was created.
+
+---
+
+### **Installation and Setup**
+
+1. **Clone the Repository**:
+   ```bash
+   git clone https://github.com/yourusername/dynamic_quiz_project.git
+   cd dynamic_quiz_project
+   ```
+
+2. **Create a Virtual Environment**:
+   ```bash
+   python3 -m venv env
+   source env/bin/activate
+   ```
+
+3. **Install Dependencies**:
+   ```bash
+   pip install -r requirements.txt
+   ```
+
+4. **Apply Migrations**:
+   ```bash
+   python manage.py migrate
+   ```
+
+5. **Run the Development Server**:
+   ```bash
+   python manage.py runserver
+   ```
+
+---
+
+### **Environment Variables**
+
+Create a `.env` file in the root directory with the following variables:
+
+```env
+SECRET_KEY=your_secret_key
+DEBUG=True
+ALLOWED_HOSTS=localhost, 127.0.0.1
+DATABASE_URL=postgres://user:password@localhost:5432/quiz_db
+GOOGLE_API_KEY=your_google_api_key
+```
+
+---
+
+### **Testing**
+
+- **Run Tests**:
+  ```bash
+  python manage.py test
+  ```
+- **Testing Coverage**: Ensure that your tests cover the key functionalities of the system, including user authentication, content upload, quiz generation, and result retrieval.
+
+---
+
+### **Deployment**
+
+1. **Prepare for Deployment**:
+   - Set `DEBUG=False` in your `.env` file.
+   - Update the `ALLOWED_HOSTS` with your domain name.
+
+2. **Deploy to Azure App Services** (Example):
+   - Follow the [Azure Django Deployment Guide](https://docs.microsoft.com/en-us/azure/developer/python/tutorial-python-django-webapp-ubuntu) to deploy your application.
+  
+3. **Configure Static Files**:
+   - Ensure static files are correctly served in your production environment.
+   - Use Django's `collectstatic` command to gather static files.
+
+---
+
+### **API Documentation**
+
+Refer to the provided [API Documentation](#api-documentation) section for details on all API endpoints.
+
+---
+
+This documentation outlines the essential components of your project, including its structure, flow, and API details, to facilitate both development and usage.
