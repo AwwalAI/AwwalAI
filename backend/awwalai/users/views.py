@@ -46,3 +46,11 @@ class LoginAPIView(APIView):
 
     def delete(self, request, *args, **kwargs):
         return Response({"error": "DELETE method not allowed."}, status=status.HTTP_405_METHOD_NOT_ALLOWED)
+    
+class CheckUsernameAPIView(APIView):
+    def get(self, request, username, format=None):
+        # Check if the username exists in the User model
+        if CustomUser.objects.filter(username=username).exists():
+            return Response({"available": False}, status=status.HTTP_200_OK)
+        else:
+            return Response({"available": True}, status=status.HTTP_200_OK)
