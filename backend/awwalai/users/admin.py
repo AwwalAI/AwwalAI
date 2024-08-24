@@ -25,3 +25,5 @@ class CustomUserAdmin(UserAdmin):
     filter_horizontal = ('user_permissions', 'groups')
 
 admin.site.register(CustomUser, CustomUserAdmin)
+admin.site.site_header = 'Awwalai administration'
+admin.site.site_title = 'Awwalai administration'

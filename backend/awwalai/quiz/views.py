@@ -45,6 +45,7 @@ class GenerateQuizAPIView(APIView):
 
     def post(self, request, *args, **kwargs):
         content_id = request.data.get('content_id')
+        print(request.data)
         if not content_id:
             return Response({'error': 'Content ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
