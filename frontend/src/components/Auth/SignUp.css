@@ -1,0 +1,6 @@
+.left-side {
+    background-image: url('../../media/bg/FrameSignupBg.png'); /* Adjust path as necessary */
+    background-size: cover;
+    background-position: top;
+    background-repeat: no-repeat;
+  }
