@@ -1,5 +1,3 @@
-# users/views.py
-
 from rest_framework import status
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -7,6 +5,7 @@ from .models import CustomUser
 from .serializers import CustomUserSerializer
 from rest_framework.authtoken.models import Token
 from django.contrib.auth import authenticate
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.permissions import AllowAny
 
 class SignupAPIView(APIView):
@@ -54,3 +53,16 @@ class CheckUsernameAPIView(APIView):
             return Response({"available": False}, status=status.HTTP_200_OK)
         else:
             return Response({"available": True}, status=status.HTTP_200_OK)
+        
+class LogoutAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, *args, **kwargs):
+        try:
+            # Get the user's token and delete it
+            request.user.auth_token.delete()
+            return Response({"success": "Successfully logged out."}, status=status.HTTP_200_OK)
+        except Token.DoesNotExist:
+            return Response({"error": "Invalid token or user is already logged out."}, status=status.HTTP_400_BAD_REQUEST)
+        except Exception as e:
+            return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
