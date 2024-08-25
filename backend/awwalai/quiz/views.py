@@ -6,6 +6,7 @@ from .models import *
 from .services.file_processing_service import FileProcessingService
 from .services.webscrapService import get_text_from_url
 from .services.aiService import generate_quiz
+from .models import UserAnswer, QuizResult, Question
 
 class ContentUploadAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -45,12 +46,32 @@ class GenerateQuizAPIView(APIView):
 
     def post(self, request, *args, **kwargs):
         content_id = request.data.get('content_id')
-        print(request.data)
         if not content_id:
             return Response({'error': 'Content ID is required.'}, status=status.HTTP_400_BAD_REQUEST)
 
         try:
             content = Document.objects.get(id=content_id, user=request.user)
+            # Check if a quiz already exists for this content
+            existing_quiz = Quiz.objects.filter(content=content).first()
+            if existing_quiz:
+                # Serialize existing quiz questions and return them
+                quiz_content = {
+                    'objective': [],
+                    'subjective': []
+                }
+                
+                for question in existing_quiz.questions.all():
+                    question_data = {
+                        'question_text': question.question_text,
+                        'question_type': question.question_type,
+                    }
+                    if question.question_type == 'objective':
+                        question_data['options'] = question.options
+                    quiz_content[question.question_type].append(question_data)
+
+                return Response({'quiz_id': existing_quiz.id, 'questions': quiz_content}, status=status.HTTP_200_OK)
+
+            # If no quiz exists, generate a new one
             content_text = content.file.read().decode('utf-8') if content.file else content.link
 
             objective = request.data.get('objective', True)
@@ -63,10 +84,21 @@ class GenerateQuizAPIView(APIView):
             quiz = Quiz.objects.create(user=request.user, content=content)
 
             for q in quiz_content['objective']:
-                Question.objects.create(quiz=quiz, question_text=q['question'], question_type='objective', options=q['options'], correct_answer=q['answer'])
+                Question.objects.create(
+                    quiz=quiz,
+                    question_text=q['question'],
+                    question_type='objective',
+                    options=q['options'],
+                    correct_answer=q['answer']
+                )
 
             for q in quiz_content['subjective']:
-                Question.objects.create(quiz=quiz, question_text=q['question'], question_type='subjective', correct_answer=q['answer'])
+                Question.objects.create(
+                    quiz=quiz,
+                    question_text=q['question'],
+                    question_type='subjective',
+                    correct_answer=q['answer']
+                )
 
             return Response({'quiz_id': quiz.id, 'questions': quiz_content}, status=status.HTTP_200_OK)
 
@@ -75,6 +107,7 @@ class GenerateQuizAPIView(APIView):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
         
 class RetrieveQuizAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -97,9 +130,6 @@ class RetrieveQuizAPIView(APIView):
 
         except Quiz.DoesNotExist:
             return Response({'error': 'Quiz not found or you do not have permission to access this quiz.'}, status=status.HTTP_404_NOT_FOUND)
-
-
-from .models import UserAnswer, QuizResult, Question
 
 class SubmitQuizAnswerAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -145,22 +175,35 @@ class QuizResultAPIView(APIView):
             # Calculate the score as a percentage
             score = (correct_answers / total_questions) * 100 if total_questions > 0 else 0
 
-            # Create a QuizResult entry for the quiz
-            quiz_result = QuizResult.objects.create(
+            # Check if a QuizResult already exists for this user and quiz
+            quiz_result, created = QuizResult.objects.get_or_create(
                 user=request.user,
                 quiz=quiz,
-                score=score,
-                total_questions=total_questions,
-                correct_answers=correct_answers
+                defaults={
+                    'score': score,
+                    'total_questions': total_questions,
+                    'correct_answers': correct_answers
+                }
             )
 
-            # Create an entry in QuizHistory if needed (not mandatory)
-            QuizHistory.objects.create(user=request.user, quiz=quiz, quiz_result=quiz_result)
+            # If the QuizResult already exists, update it with the new score
+            if not created:
+                quiz_result.score = score
+                quiz_result.total_questions = total_questions
+                quiz_result.correct_answers = correct_answers
+                quiz_result.save()
+
+            # Optionally update or create a QuizHistory entry
+            QuizHistory.objects.update_or_create(
+                user=request.user,
+                quiz=quiz,
+                defaults={'quiz_result': quiz_result}
+            )
 
             return Response({
-                'score': score,
-                'total_questions': total_questions,
-                'correct_answers': correct_answers
+                'score': quiz_result.score,
+                'total_questions': quiz_result.total_questions,
+                'correct_answers': quiz_result.correct_answers
             }, status=status.HTTP_200_OK)
 
         except Quiz.DoesNotExist:
