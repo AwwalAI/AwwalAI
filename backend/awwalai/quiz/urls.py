@@ -5,7 +5,7 @@ from .views import (
     RetrieveQuizAPIView,
     SubmitQuizAnswerAPIView,
     QuizResultAPIView,
-    UserQuizHistoryAPIView
+    UserQuizHistoryAPIView,
 )
 
 urlpatterns = [
