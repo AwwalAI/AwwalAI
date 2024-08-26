@@ -8,6 +8,8 @@ from .services.webscrapService import get_text_from_url
 from .services.aiService import generate_quiz
 from .models import UserAnswer, QuizResult, Question
 from .serializers import *
+import chardet
+from io import BytesIO
 
 class ContentUploadAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -36,6 +38,7 @@ class ContentUploadAPIView(APIView):
 
             # Save the content in the Document model
             document = Document.objects.create(user=request.user, content_type=content_type, file=file if file else None, link=url if url else None)
+            
             return Response({'content_id': document.id, 'status': 'Content uploaded successfully'}, status=status.HTTP_200_OK)
 
         except Exception as e:
@@ -52,16 +55,13 @@ class GenerateQuizAPIView(APIView):
 
         try:
             content = Document.objects.get(id=content_id, user=request.user)
-            # Check if a quiz already exists for this content
             existing_quiz = Quiz.objects.filter(content=content).first()
             if existing_quiz:
-                # Serialize existing quiz questions and return them
                 quiz_content = {
                     'title': existing_quiz.title,
                     'objective': [],
                     'subjective': []
                 }
-                
                 for question in existing_quiz.questions.all():
                     question_data = {
                         'question_text': question.question_text,
@@ -74,7 +74,15 @@ class GenerateQuizAPIView(APIView):
                 return Response({'quiz_id': existing_quiz.id, 'title': quiz_content['title'], 'questions': quiz_content}, status=status.HTTP_200_OK)
 
             # If no quiz exists, generate a new one
-            content_text = content.file.read().decode('utf-8') if content.file else content.link
+            file_processing_service = FileProcessingService()
+            content_text = None
+
+            if content.file:
+                content_text = file_processing_service.process_file(content.file)
+            elif content.link:
+                content_text = get_text_from_url(content.link)
+                if content_text is None:
+                    return Response({'error': 'Unable to scrape the provided URL. Please ensure the web page is publicly available.'}, status=status.HTTP_400_BAD_REQUEST)
 
             objective = request.data.get('objective', True)
             subjective = request.data.get('subjective', True)
@@ -112,7 +120,6 @@ class GenerateQuizAPIView(APIView):
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
-
         
 class RetrieveQuizAPIView(APIView):
     permission_classes = [IsAuthenticated]

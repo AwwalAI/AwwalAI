@@ -1,9 +1,12 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";  // Import useNavigate for redirection
 import UploadIcon from "../../media/icon/UploadIcon.png";
 
 export default function Section() {
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState(""); // State to store the file name
+  const [link, setLink] = useState("");  // State to store the link
+  const navigate = useNavigate();  // Initialize useNavigate for redirection
 
   const handleDragEnter = (e) => {
     e.preventDefault();
@@ -40,8 +43,27 @@ export default function Section() {
       setFileName(files[0].name); // Set the file name in state
     }
   };
- 
-  
+
+  const handleLinkChange = (e) => {
+    setLink(e.target.value); // Update link state when input changes
+  };
+
+  const handleSubmit = () => {
+    const authToken = sessionStorage.getItem('authToken');  // Check if user is logged in
+
+    if (!authToken) {
+      // If not logged in, redirect to login
+      navigate("/login");
+    } else {
+      // If logged in, redirect to dashboard with fileName and link as state
+      navigate("/dashboard", {
+        state: {
+          fileName: fileName,
+          link: link
+        }
+      });
+    }
+  };
 
   return (
     <div className="container flex justify-center items-center relative z-10">
@@ -101,8 +123,13 @@ export default function Section() {
               type="text"
               placeholder="Paste any link here..."
               className="flex-grow px-4 py-2 focus:outline-none font-gothic placeholder:text-gray-400"
+              value={link}  // Bind link state to input value
+              onChange={handleLinkChange}  // Handle input change
             />
-            <button  className="bg-gray-800 text-white px-4 py-4 transition duration-200 font-sans">
+            <button
+              className="bg-gray-800 text-white px-4 py-4 transition duration-200 font-sans"
+              onClick={handleSubmit}  // Handle submit on button click
+            >
               Create Quiz →
             </button>
           </div>

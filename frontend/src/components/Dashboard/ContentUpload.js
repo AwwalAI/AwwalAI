@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { uploadContent, generateQuiz } from '../../services/api';
 import UploadIcon from "../../media/icon/UploadIcon.png";
-import RemoveIcon from "../../media/icon//remove-icon.png"; // Assuming you have a remove icon
+import RemoveIcon from "../../media/icon/remove-icon.png"; // Assuming you have a remove icon
 
 const ContentUpload = () => {
   const [file, setFile] = useState(null);
@@ -16,49 +16,91 @@ const ContentUpload = () => {
   const [error, setError] = useState(''); // State for error messages
   const navigate = useNavigate();
 
+
   const handleSubmit = async (e) => {
     e.preventDefault();
 
-    // Check if both file and URL are provided
     if (file && url) {
       setError('Please provide only one source: either upload a file or paste a URL.');
       return;
     }
 
-    setLoading(true);  // Start loading
-    setError(''); // Clear previous errors
+    if (!file && !url) {
+      setError('Please provide a source: either upload a file or paste a URL.');
+      return;
+    }
+
+    if (!objective && !subjective) {
+      setError('Please select at least one question type (Objective or Subjective).');
+      return;
+    }
+
+    setLoading(true);
+    setError('');
 
     const formData = new FormData();
-    if (file) {
-      formData.append('file', file);
-    }
-    if (url) {
-      formData.append('url', url);
-    }
-    formData.append('objective', objective);
-    formData.append('subjective', subjective);
-    formData.append('num_objective', numObjective);
-    formData.append('num_subjective', numSubjective);
+    if (file) formData.append('file', file);
+    if (url) formData.append('url', url);
 
     try {
-      const response = await uploadContent(formData);
-      const contentId = response.data.content_id;
+      // Step 1: Upload Content
+      const contentResponse = await uploadContent(formData);
+      if (contentResponse.status !== 200) {
+        throw new Error('Content upload failed');
+      }
+      const contentId = contentResponse.data.content_id;
 
+      // Step 2: Generate Quiz
       const quizData = {
         content_id: contentId,
         objective,
         subjective,
-        num_objective: numObjective,
-        num_subjective: numSubjective,
+        num_objective: objective ? numObjective : 0,
+        num_subjective: subjective ? numSubjective : 0,
       };
+
       const quizResponse = await generateQuiz(quizData);
+      if (quizResponse.status !== 200) {
+        throw new Error('Quiz generation failed');
+      }
       const quizId = quizResponse.data.quiz_id;
 
       navigate(`/quiz/${quizId}`);
     } catch (error) {
-      console.error('Error during content upload or quiz generation:', error);
+      console.error('Error:', error);
+      
+      if (error.response) {
+        // The request was made and the server responded with a status code
+        // that falls out of the range of 2xx
+        switch (error.response.status) {
+          case 400:
+            setError(error.response.data.error || 'Bad request. Please check your input.');
+            break;
+          case 401:
+            setError('Unauthorized. Please log in again.');
+            // You might want to redirect to login page here
+            break;
+          case 403:
+            setError('Forbidden. You do not have permission to perform this action.');
+            break;
+          case 404:
+            setError('Resource not found. Please try again later.');
+            break;
+          case 500:
+            setError('Internal server error. Please try again later.');
+            break;
+          default:
+            setError('An unexpected error occurred. Please try again later.');
+        }
+      } else if (error.request) {
+        // The request was made but no response was received
+        setError('No response from server. Please check your internet connection.');
+      } else {
+        // Something happened in setting up the request that triggered an Error
+        setError('An error occurred while processing your request. Please try again.');
+      }
     } finally {
-      setLoading(false);  // Stop loading
+      setLoading(false);
     }
   };
 
@@ -112,7 +154,7 @@ const ContentUpload = () => {
   return (
     <div className="flex justify-center z-10">
       <div className="p-8 w-2/3">
-        <h2 className="text-3xl font-semibold font-gothic mb-6">Create new quiz</h2>
+        <h2 className="text-3xl font-semibold font-gothic mb-6">Create New Quiz</h2>
         {error && (
           <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
             {error}
@@ -162,7 +204,7 @@ const ContentUpload = () => {
               type="url"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
-              placeholder='Paste Link Here..'
+              placeholder="Paste Link Here..."
               className="w-full px-4 py-4 border-2 border-gray-300 hover:border-black font-gothic placeholder:text-gray-400"
               disabled={file} // Disable URL input if a file is selected
             />

@@ -93,7 +93,7 @@ const Signup = () => {
     }
 
     try {
-      const response = await signup({
+      await signup({
         username,
         password,
         confirm_password: confirmPassword,

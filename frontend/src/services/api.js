@@ -45,7 +45,7 @@ export const uploadContent = (formData) => {
 
 // Quiz List API
 export const getQuizzes = () => {
-  return api.get("/quiz/", {
+  return api.get("/quiz/user/quizzes/", {
     headers: {
       Authorization: `Token ${sessionStorage.getItem("authToken")}`,
     },
@@ -60,6 +60,15 @@ export const getQuizResult = (quizId) => {
     },
   });
 };
+
+// Quiz Results By User
+export const getQuizResultsByUser = () =>{
+  return api.get(`/quiz/user/quiz-results/`, {
+    headers: {
+      Authorization: `Token ${sessionStorage.getItem("authToken")}`,
+    },
+  });
+}
 
 // New function to generate quiz
 export const generateQuiz = (quizData) => {
