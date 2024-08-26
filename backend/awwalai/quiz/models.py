@@ -22,10 +22,11 @@ class Document(models.Model):
 class Quiz(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='quizzes')
     content = models.ForeignKey(Document, on_delete=models.CASCADE, related_name='quizzes')
+    title = models.CharField(max_length=255, default="QUIZ TITLE DEFAULT")
     created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return f"Quiz {self.id} by {self.user.username}"
+        return f"Quiz {self.id} - {self.title} by {self.user.username}"
 
 class Question(models.Model):
     QUESTION_TYPE_CHOICES = [

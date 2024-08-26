@@ -7,6 +7,7 @@ from .services.file_processing_service import FileProcessingService
 from .services.webscrapService import get_text_from_url
 from .services.aiService import generate_quiz
 from .models import UserAnswer, QuizResult, Question
+from .serializers import *
 
 class ContentUploadAPIView(APIView):
     permission_classes = [IsAuthenticated]
@@ -56,6 +57,7 @@ class GenerateQuizAPIView(APIView):
             if existing_quiz:
                 # Serialize existing quiz questions and return them
                 quiz_content = {
+                    'title': existing_quiz.title,
                     'objective': [],
                     'subjective': []
                 }
@@ -69,7 +71,7 @@ class GenerateQuizAPIView(APIView):
                         question_data['options'] = question.options
                     quiz_content[question.question_type].append(question_data)
 
-                return Response({'quiz_id': existing_quiz.id, 'questions': quiz_content}, status=status.HTTP_200_OK)
+                return Response({'quiz_id': existing_quiz.id, 'title': quiz_content['title'], 'questions': quiz_content}, status=status.HTTP_200_OK)
 
             # If no quiz exists, generate a new one
             content_text = content.file.read().decode('utf-8') if content.file else content.link
@@ -79,10 +81,13 @@ class GenerateQuizAPIView(APIView):
             num_objective = int(request.data.get('num_objective', 5))
             num_subjective = int(request.data.get('num_subjective', 5))
 
+            # Generate the quiz content including the title
             quiz_content = generate_quiz(content_text, objective, subjective, num_objective, num_subjective)
 
-            quiz = Quiz.objects.create(user=request.user, content=content)
+            # Create a new quiz with the generated title
+            quiz = Quiz.objects.create(user=request.user, content=content, title=quiz_content['title'])
 
+            # Save the generated questions to the database
             for q in quiz_content['objective']:
                 Question.objects.create(
                     quiz=quiz,
@@ -100,7 +105,7 @@ class GenerateQuizAPIView(APIView):
                     correct_answer=q['answer']
                 )
 
-            return Response({'quiz_id': quiz.id, 'questions': quiz_content}, status=status.HTTP_200_OK)
+            return Response({'quiz_id': quiz.id, 'title': quiz.title, 'questions': quiz_content}, status=status.HTTP_200_OK)
 
         except Document.DoesNotExist:
             return Response({'error': 'Document not found or you do not have permission to access this content.'}, status=status.HTTP_404_NOT_FOUND)
@@ -126,7 +131,7 @@ class RetrieveQuizAPIView(APIView):
                     'options': question.options if question.question_type == 'objective' else None
                 })
 
-            return Response({'quiz': quiz.id, 'questions': question_data}, status=status.HTTP_200_OK)
+            return Response({'quiz_id': quiz.id, 'title': quiz.title, 'questions': question_data}, status=status.HTTP_200_OK)
 
         except Quiz.DoesNotExist:
             return Response({'error': 'Quiz not found or you do not have permission to access this quiz.'}, status=status.HTTP_404_NOT_FOUND)
@@ -217,27 +222,34 @@ class QuizResultAPIView(APIView):
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-class UserQuizHistoryAPIView(APIView):
+class UserQuizzesAPIView(APIView):
     permission_classes = [IsAuthenticated]
 
-    def get(self, request, user_id, *args, **kwargs):
+    def get(self, request, *args, **kwargs):
         try:
-            if request.user.id != user_id:
-                return Response({'error': 'You do not have permission to view this history.'}, status=status.HTTP_403_FORBIDDEN)
+            # Fetch all quizzes taken by the authenticated user
+            user_quizzes = Quiz.objects.filter(user=request.user).order_by('-created_at')
 
-            quiz_history = QuizHistory.objects.filter(user=request.user).order_by('-taken_at')
+            # Serialize the quiz data including the title
+            serialized_quizzes = QuizSerializerR(user_quizzes, many=True).data
 
-            history_data = []
-            for history in quiz_history:
-                history_data.append({
-                    'quiz_id': history.quiz.id,
-                    'score': history.quiz_result.score,
-                    'total_questions': history.quiz_result.total_questions,
-                    'correct_answers': history.quiz_result.correct_answers,
-                    'taken_at': history.taken_at
-                })
+            return Response({'quizzes': serialized_quizzes}, status=status.HTTP_200_OK)
 
-            return Response({'quiz_history': history_data}, status=status.HTTP_200_OK)
+        except Exception as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+class UserQuizResultsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        try:
+            # Fetch all quiz results for the authenticated user
+            user_quiz_results = QuizResult.objects.filter(user=request.user).order_by('-created_at')
+
+            # Serialize the quiz results data
+            serialized_results = QuizResultSerializer(user_quiz_results, many=True).data
+
+            return Response({'quiz_results': serialized_results}, status=status.HTTP_200_OK)
 
         except Exception as e:
             return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

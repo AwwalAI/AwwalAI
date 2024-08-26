@@ -31,7 +31,10 @@ def generate_quiz(context, objective=True, subjective=True, num_objective=5, num
 
         Context: '''+context+'''
 
-        Task: Generate up to '''+str(num_objective)+ '''objective and'''+str(num_subjective)+'''subjective high-quality question and answer pairs based on the given context. Follow these guidelines:
+        Task: 
+        1. Generate a relevant and engaging title for a quiz based on the provided context.
+        
+        2. Generate up to '''+str(num_objective)+ '''objective and'''+str(num_subjective)+'''subjective high-quality question and answer pairs based on the given context. Follow these guidelines:
 
             1. Question:
             - Make it relevant to the context
@@ -47,9 +50,10 @@ def generate_quiz(context, objective=True, subjective=True, num_objective=5, num
 
         Format:
             {
+                "title": "Your generated title",
                 "objective": [
                     {{"question": "Your generated question", "options": ["Option1","Option2","Option3","Option4"], "answer":"Correct Answer","explanation":""}},
-                ],
+                ],-
                 "subjective": [
                     {{"question": "Your generated question", "answer": "Your generated answer"}},
                 ]

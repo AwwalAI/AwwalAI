@@ -12,7 +12,7 @@ class DocumentAdmin(admin.ModelAdmin):
 # Register the Quiz model
 @admin.register(Quiz)
 class QuizAdmin(admin.ModelAdmin):
-    list_display = ('id', 'user', 'content', 'created_at')
+    list_display = ('title', 'user', 'content', 'created_at')
     list_filter = ('created_at',)
     search_fields = ('user__username', 'content__id')
     readonly_fields = ('created_at',)
